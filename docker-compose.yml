@@ -1,0 +1,26 @@
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      PORT: 8080
+      # Auth: HS256 secret shared with auth-service (local JWT verification)
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?AUTH_JWT_SECRET is required}
+      # intents-service: classification (POST /intents/detect) and catalog
+      INTENTS_SERVICE_URL: ${INTENTS_SERVICE_URL:-http://host.docker.internal:4002}
+      INTENTS_INTERNAL_SECRET: ${INTENTS_INTERNAL_SECRET:?INTENTS_INTERNAL_SECRET is required}
+      # WhatsApp Cloud API (Meta)
+      META_APP_SECRET: ${META_APP_SECRET:?META_APP_SECRET is required}
+      META_VERIFY_TOKEN: ${META_VERIFY_TOKEN:?META_VERIFY_TOKEN is required}
+      META_ACCESS_TOKEN: ${META_ACCESS_TOKEN:?META_ACCESS_TOKEN is required}
+      META_PHONE_NUMBER_ID: ${META_PHONE_NUMBER_ID:-}
+      META_API_VERSION: ${META_API_VERSION:-v21.0}
+      REDIS_URL: ${REDIS_URL:-}
+      NODE_RED_BASE_URL: ${NODE_RED_BASE_URL:-http://host.docker.internal:1878}
+      STEPS_SERVICE_BASE_URL: ${STEPS_SERVICE_BASE_URL:-http://host.docker.internal:3000}
+      NODE_RED_TIMEOUT_MS: ${NODE_RED_TIMEOUT_MS:-10000}
+      GATEWAY_FALLBACK_STEP: ${GATEWAY_FALLBACK_STEP:-}

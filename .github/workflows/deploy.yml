@@ -1,0 +1,67 @@
+name: Build & notify infra
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # OIDC → AWS
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  # ─── CI: typecheck + test + build ──────────────────────────────────────────────────
+  ci:
+    name: Typecheck, Test & Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  # ─── Build: imagen a ECR + aviso a infra (sólo en main) ────────────────────────────
+  build-push:
+    name: Build image & push to ECR
+    needs: ci
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & push image
+        env:
+          IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}
+          SHA: ${{ github.sha }}
+        run: |
+          docker build -t $IMAGE:$SHA -t $IMAGE:latest .
+          docker push $IMAGE:$SHA
+          docker push $IMAGE:latest
+
+      # ─── Dispara infra-node-red: cdk deploy + force new deployment en ECS ─────────
+      - name: Trigger infra deploy
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.INFRA_DISPATCH_TOKEN }}
+          repository: gygtechdevs/infra-node-red
+          event-type: image-pushed
+          client-payload: '{"service":"gateway","image":"${{ secrets.ECR_REPOSITORY }}","sha":"${{ github.sha }}"}'
