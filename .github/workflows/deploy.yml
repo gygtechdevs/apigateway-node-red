@@ -38,6 +38,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Debug AWS_ROLE_ARN
+        env:
+          ACTUAL: ${{ secrets.AWS_ROLE_ARN }}
+          EXPECTED: arn:aws:iam::372349310729:role/nodered-image-builder
+        run: |
+          if [ "$ACTUAL" = "$EXPECTED" ]; then
+            echo "MATCH: el secret apunta al rol correcto"
+          else
+            echo "MISMATCH: el secret NO es el rol esperado (longitud ${#ACTUAL})"
+          fi
+
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
